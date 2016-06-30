@@ -28,5 +28,4 @@ design:23.2.0可以，但是design:23.3.0就会有一点点问题，原因未知
 
 欢迎留言交流，如果有更好的建议，请多多指教。
 
-博客介绍：
-     待续。。。
+博客介绍：http://blog.csdn.net/likuan0214/article/details/51784586
