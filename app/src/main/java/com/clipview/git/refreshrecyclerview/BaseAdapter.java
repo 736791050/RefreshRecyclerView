@@ -3,6 +3,7 @@ package com.clipview.git.refreshrecyclerview;
 import android.content.Context;
 import android.support.v7.widget.RecyclerView.Adapter;
 import android.support.v7.widget.RecyclerView.ViewHolder;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -21,6 +22,7 @@ public abstract class BaseAdapter<T,K extends ViewHolder> extends Adapter<K> {
     public Context context;
     private int  mResources;
     private ItemOnclickLinstener itemOnclickLinstener;
+    protected boolean scroll;
 
     public BaseAdapter(Context context, List<T> mMessages, int mResources) {
         this.mMessages = mMessages;
@@ -121,6 +123,16 @@ public abstract class BaseAdapter<T,K extends ViewHolder> extends Adapter<K> {
      */
     public void setItemOnClickLinsteners(ItemOnclickLinstener itemOnclickLinstener){
         this.itemOnclickLinstener = itemOnclickLinstener;
+    }
+
+
+    public void setScrolling(boolean scroll){
+        Log.i("scroll----state", "boolean:" + scroll);
+        this.scroll = scroll;
+    }
+
+    public boolean getScrolling(){
+        return scroll;
     }
 
     /**

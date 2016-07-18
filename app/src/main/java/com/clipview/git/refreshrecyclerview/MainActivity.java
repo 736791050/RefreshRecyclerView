@@ -2,6 +2,7 @@ package com.clipview.git.refreshrecyclerview;
 
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
 import android.support.v7.app.AppCompatActivity;
 import android.view.View;
 import android.widget.Toast;
@@ -36,52 +37,56 @@ public class MainActivity extends AppCompatActivity implements RefreshRecyclerVi
         mAdapter.setItemOnClickLinsteners(new BaseAdapter.ItemOnclickLinstener() {
             @Override
             public void setItemOnclickLinsteners(View v, int postion, int type) {
+                //设置item的点击事件
 
             }
         });
+
+        state = FIRST;
 
         doActionGetContent();
 
     }
 
     private void doActionGetContent() {
-        new Handler().postDelayed(new Runnable() {
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        final boolean requestOk = true;
+
+        //请求结果进行进一步操作
+        runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                final boolean requestOk = true;
-                //请求结果进行进一步操作
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        if(requestOk) {//请求成功
-                            if (state == FIRST || state == REFRESH) {
-                                list.clear();
-                                mRecyclerView.onStopRefresh();
-                                //根据需要来写是否有加载更多
-                                mRecyclerView.setHasMore(true);
-                            } else if (state == LOADMORE) {
-                                mRecyclerView.onStopMore();
-                                mRecyclerView.setHasMore(false);
-                            }
-                            addContents();
-                            mAdapter.notifyDataSetChanged();
-                        }else {//请求失败
-                            Toast.makeText(MainActivity.this, "请求失败", Toast.LENGTH_SHORT).show();
-                            if(state == LOADMORE){
-                                mRecyclerView.onStopMore();
-                            }else if(state == REFRESH){
-                                mRecyclerView.onStopRefresh();
-                            }
-                        }
+                if(requestOk) {//请求成功
+                    if (state == FIRST || state == REFRESH) {
+                        list.clear();
+                        mRecyclerView.onStopRefresh();
+                        //根据需要来写是否有加载更多
+                        mRecyclerView.setHasMore(true);
+                    } else if (state == LOADMORE) {
+                        mRecyclerView.onStopMore();
+                        mRecyclerView.setHasMore(false);
                     }
-                });
+                    addContents();
+                    mAdapter.notifyDataSetChanged();
+                }else {//请求失败
+                    Toast.makeText(MainActivity.this, "请求失败", Toast.LENGTH_SHORT).show();
+                    if(state == LOADMORE){
+                        mRecyclerView.onStopMore();
+                    }else if(state == REFRESH){
+                        mRecyclerView.onStopRefresh();
+                    }
+                }
             }
-        }, 3000);
+        });
     }
 
     private void addContents() {
         int size = list.size();
-        for(int i = 0; i < 10; i ++){
+        for(int i = 0; i < 15; i ++){
             list.add("测试内容" + (size + i));
         }
     }

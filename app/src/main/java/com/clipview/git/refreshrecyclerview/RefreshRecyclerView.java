@@ -7,6 +7,7 @@ import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.util.AttributeSet;
 import android.util.Log;
+import android.view.GestureDetector;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
@@ -19,8 +20,11 @@ import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
 
-public class RefreshRecyclerView extends LinearLayout{
+public class RefreshRecyclerView extends LinearLayout implements GestureDetector.OnGestureListener{
 
     public static final long ONE_MINUTE = 60 * 1000;//一分钟的毫秒值，用于判断上次的更新时间
 
@@ -32,7 +36,7 @@ public class RefreshRecyclerView extends LinearLayout{
 
     public static final long ONE_YEAR = 12 * ONE_MONTH;//一年的毫秒值，用于判断上次的更新时间
 
-    private String MYRECYCLERVIEW = "MyRecyclerView";//保存用的
+    private final GestureDetector mGestureDetector;//手势监听
 
     private int id;//用来区分不同页面
 
@@ -81,6 +85,17 @@ public class RefreshRecyclerView extends LinearLayout{
 
     private int readCount;//判断当前列表最大滚动位置
 
+    private static final String TAG = "RefreshRecyclerView";
+
+
+    private int scroll_count;
+
+    private boolean scrlled;//是否滚动了,优化用
+
+
+    //用来计时
+    private Map<Integer, Long> maps = new HashMap<>();
+
     public RefreshRecyclerView(Context context) {
         this(context, null);
     }
@@ -89,6 +104,8 @@ public class RefreshRecyclerView extends LinearLayout{
         super(context, attrs);
         this.context = context;
         initContents();
+        mGestureDetector = new GestureDetector(context, this);
+        scroll_count = -1;
     }
 
     /**
@@ -123,8 +140,8 @@ public class RefreshRecyclerView extends LinearLayout{
 
         //添加布局
         setOrientation(VERTICAL);
-        addView(headerView, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
-        addView(mRecyclerView, new LayoutParams(LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        addView(headerView, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+        addView(mRecyclerView, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
 
         //隐藏头部
         setTopPadding(-mHeaderHeight);
@@ -139,6 +156,11 @@ public class RefreshRecyclerView extends LinearLayout{
         animation.setInterpolator(lin);
         iv_head.startAnimation(animation);
 
+    }
+
+    @Override
+    protected void onLayout(boolean changed, int l, int t, int r, int b) {
+        super.onLayout(changed, l, t, r, b);
     }
 
     /**
@@ -176,6 +198,40 @@ public class RefreshRecyclerView extends LinearLayout{
         return mRecyclerView;
     }
 
+    @Override
+    public boolean onDown(MotionEvent motionEvent) {
+        return false;
+    }
+
+    @Override
+    public void onShowPress(MotionEvent motionEvent) {
+
+    }
+
+    @Override
+    public boolean onSingleTapUp(MotionEvent motionEvent) {
+        return false;
+    }
+
+    @Override
+    public boolean onScroll(MotionEvent motionEvent, MotionEvent motionEvent1, float v, float v1) {
+        return false;
+    }
+
+    @Override
+    public void onLongPress(MotionEvent motionEvent) {
+
+    }
+
+    @Override
+    public boolean onFling(MotionEvent motionEvent, MotionEvent motionEvent1, float v, float v1) {
+        Log.i(TAG, "onFling: " + Math.abs(v1));
+        if(Math.abs(v1) > 4000){
+            mAdapter.setScrolling(true);
+        }
+        return false;
+    }
+
     /**
      * 加载监听器
      */
@@ -211,6 +267,23 @@ public class RefreshRecyclerView extends LinearLayout{
         void onScrolled(int firstVisibleItem, int dx, int dy);
     }
 
+
+    public interface CardShowLinsteners{
+        void cardshow(int visiblePostion, long begin_time, long end_time, boolean clicked);
+    }
+
+    private CardShowLinsteners cardShowLinsteners;
+    public void setCardShowLinsteners(CardShowLinsteners cardShowLinsteners){
+        this.cardShowLinsteners = cardShowLinsteners;
+    }
+
+
+    public void getItemClickTime(int postion){
+        if(cardShowLinsteners != null && maps.size() > postion){
+            cardShowLinsteners.cardshow(postion, maps.get(postion), System.currentTimeMillis(), true);
+        }
+    }
+
     /**
      * 设置滚动监听
      * @param scrollLinsteners
@@ -227,14 +300,22 @@ public class RefreshRecyclerView extends LinearLayout{
         return readCount;
     }
 
+
+    /**
+     * 获取滚动次数
+     */
+    public int getScrollCount(){
+        return scroll_count;
+    }
+
+    public void setScrollCount(int scroll_count){
+        this.scroll_count = scroll_count;
+    }
+
+
     @Override
     public boolean onInterceptTouchEvent(MotionEvent ev) {
-
-        if(!canScroll) {//禁止事件传递
-            return true;
-        }else {
-            return false;
-        }
+        return !canScroll;
     }
 
     private float moveY, startY = -1, dY;
@@ -243,23 +324,27 @@ public class RefreshRecyclerView extends LinearLayout{
         /**
          * 添加触摸监听，实现下拉效果
          */
-        mRecyclerView.setOnTouchListener(new OnTouchListener() {
+        mRecyclerView.setOnTouchListener(new View.OnTouchListener() {
             @Override
             public boolean onTouch(View v, MotionEvent event) {
+
+                mGestureDetector.onTouchEvent(event);
+
                 if (canRefresh && firstVisibleItemPostion == 0 && !isLoading && hasRefresh) {
                     switch (event.getAction()) {
                         case MotionEvent.ACTION_DOWN:
                             startY = -1;
-                            Log.i("move---", "down:-1");
+                            Log.i("touch----", "down   startY "+ startY + "  moveY " + moveY);
+
                             break;
                         case MotionEvent.ACTION_MOVE:
                             moveY = event.getRawY();
-                            Log.i("move----1", "startY:"+ startY + "  moveY:" + moveY + "  dY:" + dY + "  headerHeight:" + mHeaderHeight);
+                            Log.i("touch----b", "move_b   startY "+ startY + "   moveY " + moveY);
                             if(startY == -1) {
                                 startY = moveY;
                             }
                             dY = moveY - startY;
-                            Log.i("move----2", "startY:"+ startY + "  moveY:" + moveY + "  dY:" + dY + "  headerHeight:" + mHeaderHeight);
+                            Log.i("touch----", "move   startY "+ startY + "   moveY " + moveY + "   dY " + dY);
                             if (dY > 30) {
                                 dY = dY - 30;
                                 int maxLength = mHeaderHeight * 6;
@@ -275,14 +360,13 @@ public class RefreshRecyclerView extends LinearLayout{
                                 }
                                 setTopPadding((int)(dY - mHeaderHeight));
                             } else {
-                                Log.i("move---", "reset");
                                 setTopPadding(- mHeaderHeight);
                                 return false;
                             }
                             break;
                         case MotionEvent.ACTION_UP:
-                            Log.i("move---", "up:-1");
-                            if (dY > mHeaderHeight / 2) {
+                            Log.i("touch----", "up   startY "+ startY + "   moveY " + moveY + "   dY " + dY);
+                            if (dY > mHeaderHeight) {
                                 isLoading = true;
                                 canScroll = false;
                                 canRefresh = false;
@@ -290,18 +374,14 @@ public class RefreshRecyclerView extends LinearLayout{
                                 arrow.setVisibility(View.GONE);
                                 progress_bar.setVisibility(View.VISIBLE);
                                 new RefreshingTask().execute();
-                                if(loadLinsteners != null) {
-                                    loadLinsteners.onRefresh();
-                                }
                             } else {
                                 startY = -1;
                                 new HideHeaderTask().execute();
-                                return false;
                             }
                             dY = 0;
                             startY = -1;
                             moveY = 0;
-                            break;
+                            return false;
                     }
                     return true;
                 }
@@ -316,12 +396,46 @@ public class RefreshRecyclerView extends LinearLayout{
             @Override
             public void onScrolled(RecyclerView recyclerView, int dx, int dy) {
                 super.onScrolled(recyclerView, dx, dy);
+
+                if(dy != 0){
+                    scrlled = true;
+                }
+
                 firstVisibleItemPostion = mLayoutManager.findFirstVisibleItemPosition();
                 int lastVisibleItem = mLayoutManager.findLastVisibleItemPosition();
                 int totalItemCount = mLayoutManager.getItemCount();
                 if (readCount <= lastVisibleItem) {
                     readCount = lastVisibleItem;
                 }
+
+                //数据统计(用来统计每个卡片被展示的起始时间和位置)
+                if(cardShowLinsteners != null) {
+                    int size = lastVisibleItem - firstVisibleItemPostion;
+                    if (size > 0) {
+                        long time = System.currentTimeMillis();
+                        Iterator<Map.Entry<Integer, Long>> it = maps.entrySet().iterator();
+                        while(it.hasNext()){
+                            Map.Entry<Integer, Long> entry=it.next();
+                            int key=entry.getKey();
+                            if (key > lastVisibleItem || key < firstVisibleItemPostion) {
+                                Long ttime = entry.getValue();
+                                it.remove();
+                                if (time - ttime > 2000) {
+                                    cardShowLinsteners.cardshow(key, ttime, time, false);
+                                }
+                            }
+                        }
+
+                        for (int i = 0; i < size; i++) {
+                            if (!maps.containsKey(firstVisibleItemPostion + i)) {//没有
+                                maps.put(firstVisibleItemPostion + i, time);
+                            }
+                        }
+                    }
+                }
+
+
+
 
                 //lastVisibleItem >= totalItemCount - 4 表示剩下4个item自动加载
                 // dy > 0 表示向下滑动
@@ -337,9 +451,8 @@ public class RefreshRecyclerView extends LinearLayout{
 
                 //如果列表在头部
                 if (firstVisibleItemPostion == 0 && mLayoutManager.getChildAt(0).getTop() == 0 && hasRefresh) {
-                    Log.i("move---", "recyclerview:reset:-1");
                     canRefresh = true;
-                    startY = -1;
+//                    startY = -1;
                 } else {
                     canRefresh = false;
                 }
@@ -351,6 +464,28 @@ public class RefreshRecyclerView extends LinearLayout{
 
             @Override
             public void onScrollStateChanged(RecyclerView recyclerView, int newState) {
+                Log.i(TAG, "stated:" + newState + "  time:" + System.currentTimeMillis());
+                switch (newState){
+                    case RecyclerView.SCROLL_STATE_IDLE: // The RecyclerView is not currently scrolling.
+                        scroll_count ++;
+//                        Log.i("scroll_state", "state:" + "停止");
+                        if(mAdapter.getScrolling() && scrlled) {
+                            //对于滚动不加载图片的尝试
+                            mAdapter.setScrolling(false);
+                            mAdapter.notifyDataSetChanged();
+                        }
+
+                        scrlled = false;
+                        break;
+                    case RecyclerView.SCROLL_STATE_DRAGGING: // The RecyclerView is currently being dragged by outside input such as user touch input.
+//                        mAdapter.setScrolling(false);
+//                        Log.i("scroll_state", "state:" + "拖拽");
+                        break;
+                    case RecyclerView.SCROLL_STATE_SETTLING: // The RecyclerView is currently animating to a final position while not under
+//                        mAdapter.setScrolling(true);
+//                        Log.i("scroll_state", "state:" + "滚动到某地");
+                        break;
+                }
                 super.onScrollStateChanged(recyclerView, newState);
             }
         });
@@ -391,7 +526,7 @@ public class RefreshRecyclerView extends LinearLayout{
      */
     public void saveTv_refresh_time(){
         if(id == -1)return;
-        saveSPLongData(MYRECYCLERVIEW + id, System.currentTimeMillis());
+        saveSPLongData(TAG + id, System.currentTimeMillis());
         refreshUpdatedAtValue();
     }
 
@@ -447,7 +582,7 @@ public class RefreshRecyclerView extends LinearLayout{
      */
     private void refreshUpdatedAtValue() {
         if(id == -1)return;
-        lastUpdateTime = getSPLongData(MYRECYCLERVIEW + id);
+        lastUpdateTime = getSPLongData(TAG + id);
         long currentTime = System.currentTimeMillis();
         long timePassed = currentTime - lastUpdateTime;
         long timeIntoFormat;
@@ -504,6 +639,10 @@ public class RefreshRecyclerView extends LinearLayout{
                     publishProgress(tp);
                 }
             }
+            mAdapter.setScrolling(false);
+            if(loadLinsteners != null) {
+                loadLinsteners.onRefresh();
+            }
             return tp;
         }
 
@@ -537,6 +676,7 @@ public class RefreshRecyclerView extends LinearLayout{
                         break;
                     }
                     publishProgress(tp);
+                    canScroll = true;
                 }
             }
             return tp;
@@ -552,6 +692,8 @@ public class RefreshRecyclerView extends LinearLayout{
             setTopPadding(tp);
         }
     }
+
+
 
     /**
      * 获取账户管理sp

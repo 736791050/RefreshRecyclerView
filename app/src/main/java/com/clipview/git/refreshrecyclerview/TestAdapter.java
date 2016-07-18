@@ -1,11 +1,10 @@
 package com.clipview.git.refreshrecyclerview;
 
 import android.content.Context;
-import android.content.res.Resources;
 import android.support.v7.widget.RecyclerView;
-import android.util.DisplayMetrics;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import java.util.List;
@@ -40,32 +39,23 @@ public class TestAdapter extends BaseAdapter<String, TestAdapter.TestVH> {
     }
 
     protected class TestVH extends RecyclerView.ViewHolder{
-        private TextView itemView;
+        private final TextView tv_text;
+        private final ImageView iv_img;
         public TestVH(View itemView) {
             super(itemView);
-            this.itemView = (TextView) itemView;
-            ViewGroup.LayoutParams layoutParams = itemView.getLayoutParams();
-            layoutParams.height = getHeight() / 8;
-            layoutParams.width = ViewGroup.LayoutParams.MATCH_PARENT;
+            iv_img = (ImageView)itemView.findViewById(R.id.iv_img);
+            tv_text = (TextView)itemView.findViewById(R.id.tv_text);
         }
 
         private void setContents(int position){
             String content = mMessages.get(position);
-            itemView.setText(content + " - " + position);
+            if(scroll){//滚动不加载图片
+                iv_img.setImageResource(R.mipmap.ic_launcher);
+                tv_text.setText("加载中...");
+            }else {//加载图片
+                iv_img.setImageResource(R.mipmap.ic_twitter);
+                tv_text.setText(content + " - " + position);
+            }
         }
-    }
-
-    private int getWidth(){
-        Resources resources = context.getResources();
-        DisplayMetrics displayMetrics = resources.getDisplayMetrics();
-        int widthPx = displayMetrics.widthPixels;
-        return widthPx;
-    }
-
-    private int getHeight(){
-        Resources resources = context.getResources();
-        DisplayMetrics displayMetrics = resources.getDisplayMetrics();
-        int heightPx = displayMetrics.heightPixels;
-        return heightPx;
     }
 }
